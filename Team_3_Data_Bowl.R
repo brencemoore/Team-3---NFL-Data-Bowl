@@ -68,9 +68,19 @@ TB_data <- ready_master  |> filter(defensiveTeam == 'TB')
 NO_data <- ready_master  |> filter(defensiveTeam == 'NO')
 CAR_data <- ready_master  |> filter(defensiveTeam == 'CAR')
 
-# creates a new data frame where M = playing man and Z = playing zone
+# Function used to convert a "minute:second" string to a seconds integer
+convert_clock_to_seconds <- function(clock_time) {
+  return (as.integer(strsplit(clock_time, ":")[[1]][1]) * 60 + as.integer(strsplit(clock_time, ":")[[1]][2]))
+}
+
+# Creates a new data frame where M = playing man and Z = playing zone
 new_ready_data <- ready_master |>
   mutate(pff_manZone = ifelse(pff_manZone == "Man",'M','Z'))
+
+# Converts gameClock from a character to an integer that represents seconds
+new_ready_data <- new_ready_data |>
+  mutate(gameClock = convert_clock_to_seconds(gameClock))
+head(new_ready_data)
 
 new_ready_data$pff_manZone <- as.factor(new_ready_data$pff_manZone)
 
@@ -84,11 +94,9 @@ test_data <- testing(split)
 # Initialize a logistic regression model in tidymodels using logistic_reg
 logisticModel <- logistic_reg(mode="classification", engine="glm")
 
-new_ready_data$gameClock
-
 # Fit a logistic regression model in tidymodels
 logisticModel_fit <- logisticModel |>
-  fit(pff_manZone ~ quarter + down + yardsToGo + gameClock, data=train_data)
+  fit(pff_manZone ~ down, data=train_data)
 
 # Create a binary diagnosis feature with 1 if zone and 0 if man
 train_data <- train_data |>
@@ -106,8 +114,12 @@ test_data <- augment(logisticModel_fit, test_data)
 
 # Predicted probabilities are added "to the right"
 head(test_data) #[, 31:35]
+head(train_data)
+
+test_data$.pred_class
+train_data$pff_manZone
 
 test_data |> mn_log_loss(pff_manZone, .pred_M)
-
+test_data |> mn_log_loss(pff_manZone, .pred_Z)
 
 
