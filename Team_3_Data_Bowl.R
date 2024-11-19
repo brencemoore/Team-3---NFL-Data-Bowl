@@ -3,6 +3,12 @@
 #load tidyverse and plays.csv
 library(tidyverse)
 library(tidymodels)
+
+# Function used to convert a "minute:second" string to a seconds integer
+convert_clock_to_seconds <- function(clock_time) {
+  return (as.integer(strsplit(clock_time, ":")[[1]][1]) * 60 + as.integer(strsplit(clock_time, ":")[[1]][2]))
+}
+
 master_data <- read.csv("plays.csv")
 
 #Select only gameId, playID, quarter, down, yardsToGo, defensiveTeam, gameClock, pff_passCoverage, and pff_manZone
@@ -14,6 +20,16 @@ cleaned_data <- na.omit(working_data)
 
 #remove other values
 ready_master <- cleaned_data |> filter(pff_manZone != 'Other')
+
+# Creates a new data frame where M = playing man and Z = playing zone
+ready_master <- ready_master |>
+  mutate(pff_manZone = ifelse(pff_manZone == "Man",'M','Z'))
+
+# Converts gameClock from a character to an integer that represents seconds
+ready_master <- ready_master |>
+  mutate(gameClock = convert_clock_to_seconds(gameClock))
+
+ready_master$pff_manZone <- as.factor(ready_master$pff_manZone)
 summary(ready_master)
 
 #get list of team Ids
@@ -68,21 +84,6 @@ TB_data <- ready_master  |> filter(defensiveTeam == 'TB')
 NO_data <- ready_master  |> filter(defensiveTeam == 'NO')
 CAR_data <- ready_master  |> filter(defensiveTeam == 'CAR')
 
-# Function used to convert a "minute:second" string to a seconds integer
-convert_clock_to_seconds <- function(clock_time) {
-  return (as.integer(strsplit(clock_time, ":")[[1]][1]) * 60 + as.integer(strsplit(clock_time, ":")[[1]][2]))
-}
-
-# Creates a new data frame where M = playing man and Z = playing zone
-new_ready_data <- ready_master |>
-  mutate(pff_manZone = ifelse(pff_manZone == "Man",'M','Z'))
-
-# Converts gameClock from a character to an integer that represents seconds
-new_ready_data <- new_ready_data |>
-  mutate(gameClock = convert_clock_to_seconds(gameClock))
-head(new_ready_data)
-
-new_ready_data$pff_manZone <- as.factor(new_ready_data$pff_manZone)
 
 
 # splits data into testing and training data to test logistic regression
