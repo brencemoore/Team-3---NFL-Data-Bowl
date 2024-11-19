@@ -2,6 +2,7 @@
 
 #load tidyverse and plays.csv
 library(tidyverse)
+library(tidymodels)
 master_data <- read.csv("plays.csv")
 
 #Select only gameId, playID, quarter, down, yardsToGo, defensiveTeam, gameClock, pff_passCoverage, and pff_manZone
@@ -67,19 +68,46 @@ TB_data <- ready_master  |> filter(defensiveTeam == 'TB')
 NO_data <- ready_master  |> filter(defensiveTeam == 'NO')
 CAR_data <- ready_master  |> filter(defensiveTeam == 'CAR')
 
+# creates a new data frame where M = playing man and Z = playing zone
+new_ready_data <- ready_master |>
+  mutate(pff_manZone = ifelse(pff_manZone == "Man",'M','Z'))
+
+new_ready_data$pff_manZone <- as.factor(new_ready_data$pff_manZone)
 
 
+# splits data into testing and training data to test logistic regression
+split <- initial_split(new_ready_data, prop=.7)
+train_data <- training(split)
+test_data <- testing(split)
 
 
+# Initialize a logistic regression model in tidymodels using logistic_reg
+logisticModel <- logistic_reg(mode="classification", engine="glm")
 
+new_ready_data$gameClock
 
+# Fit a logistic regression model in tidymodels
+logisticModel_fit <- logisticModel |>
+  fit(pff_manZone ~ quarter + down + yardsToGo + gameClock, data=train_data)
 
+# Create a binary diagnosis feature with 1 if zone and 0 if man
+train_data <- train_data |>
+  mutate(pff_manZone = ifelse(pff_manZone=="Z", 1, 0))
 
+# Graph logistic regression probabilities
+train_data |>
+  ggplot(aes(x=yardsToGo, y=pff_manZone)) + 
+  geom_point() + 
+  geom_smooth(formula ='y ~ x', method = "glm", method.args = list(family = "binomial"), 
+              se = FALSE) +
+  labs(x="yards to go", y="probability of zone")
 
+test_data <- augment(logisticModel_fit, test_data)
 
+# Predicted probabilities are added "to the right"
+head(test_data) #[, 31:35]
 
-
-
+test_data |> mn_log_loss(pff_manZone, .pred_M)
 
 
 
