@@ -4,11 +4,6 @@
 library(tidyverse)
 library(tidymodels)
 
-# Function used to convert a "minute:second" string to a seconds integer
-convert_clock_to_seconds <- function(clock_time) {
-  return (as.integer(strsplit(clock_time, ":")[[1]][1]) * 60 + as.integer(strsplit(clock_time, ":")[[1]][2]))
-}
-
 master_data <- read.csv("plays.csv")
 
 #Select only gameId, playID, quarter, down, yardsToGo, defensiveTeam, gameClock, pff_passCoverage, and pff_manZone
@@ -27,7 +22,11 @@ ready_master <- ready_master |>
 
 # Converts gameClock from a character to an integer that represents seconds
 ready_master <- ready_master |>
-  mutate(gameClock = convert_clock_to_seconds(gameClock))
+  mutate(gameClockSec = sapply(strsplit(gameClock, ":"), function(x) {
+    minutes <- as.numeric(x[1])
+    seconds <- as.numeric(x[2])
+    minutes * 60 + seconds
+  }))
 
 ready_master$pff_manZone <- as.factor(ready_master$pff_manZone)
 summary(ready_master)
@@ -84,10 +83,14 @@ TB_data <- ready_master  |> filter(defensiveTeam == 'TB')
 NO_data <- ready_master  |> filter(defensiveTeam == 'NO')
 CAR_data <- ready_master  |> filter(defensiveTeam == 'CAR')
 
+print(team_Ids)
 
+#"ATL" "DAL" "TEN" "TB"  "SEA" "NE"  "DET" "WAS" "LA"  "MIN" "BAL" "LV"  "IND" "BUF"
+#"NYJ" "HOU" "JAX" "NYG" "LAC" "DEN" "CAR" "PIT" "ARI" "CIN" "GB"  "PHI" "KC"  "MIA"
+#"SF"  "CHI" "CLE" "NO" 
 
 # splits data into testing and training data to test logistic regression
-split <- initial_split(new_ready_data, prop=.7)
+split <- initial_split(ATL_data, prop=.7)
 train_data <- training(split)
 test_data <- testing(split)
 
@@ -97,7 +100,7 @@ logisticModel <- logistic_reg(mode="classification", engine="glm")
 
 # Fit a logistic regression model in tidymodels
 logisticModel_fit <- logisticModel |>
-  fit(pff_manZone ~ down, data=train_data)
+  fit(pff_manZone ~ down + quarter + yardsToGo + gameClockSec, data=train_data)
 
 # Create a binary diagnosis feature with 1 if zone and 0 if man
 train_data <- train_data |>
@@ -114,13 +117,16 @@ train_data |>
 test_data <- augment(logisticModel_fit, test_data)
 
 # Predicted probabilities are added "to the right"
-head(test_data) #[, 31:35]
-head(train_data)
+#head(test_data) #[, 31:35]
+#head(train_data)
 
-test_data$.pred_class
-train_data$pff_manZone
+#test_data$.pred_class
+#test_data$pff_manZone
 
 test_data |> mn_log_loss(pff_manZone, .pred_M)
 test_data |> mn_log_loss(pff_manZone, .pred_Z)
 
+master_data$gameClock
+ready_master$gameClock
+ready_master$gameClockSec
 
