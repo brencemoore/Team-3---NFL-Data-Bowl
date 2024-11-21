@@ -84,51 +84,93 @@ summary(CLE_data)
 #  We could do the sqrt(n) where n is the number of plays
 
 # Finding unique variables
+# Check for unique pff_passCoverage values
 def_ids <- unique(CLE_data$pff_passCoverage)
-print(def_ids)
+print(def_ids)  # Ensure there is variability in the target variable
 
-# START: Split into training and testing 
+# Split the data into training and testing sets
 set.seed(123)
 data_split <- initial_split(CLE_data, prop = 0.7, strata = pff_passCoverage)
 train_data <- training(data_split)
 test_data <- testing(data_split)
 
-# Define the model
-CLEknnClass <- nearest_neighbor(mode = "classification", neighbors = 9)
+# Define the KNN model
+CLEknnClass <- nearest_neighbor(mode = "classification", neighbors = 4)
 
-# Define recipe
-CLEknnRecipe <- recipe(pff_passCoverage ~ down + yardsToGo, data = train_data) |>
+# Define the recipe with normalization
+CLEknnRecipe <- recipe(pff_passCoverage ~ down + yardsToGo, data = train_data) |> 
   step_normalize(all_numeric_predictors())
 
-# Assemble workflow
-CLEknnWflow <- workflow() |>
-  add_recipe(CLEknnRecipe) |>
+# Assemble the workflow
+CLEknnWflow <- workflow() |> 
+  add_recipe(CLEknnRecipe) |> 
   add_model(CLEknnClass)
 
 # Fit the model
 CLEknnfit <- fit(CLEknnWflow, train_data)
 
-# Make predictions on test set
+# Make predictions on the test set
 testPred <- predict(CLEknnfit, test_data)
 
+# I could be crazy but I think when I was running this code with my new code it was overtraining my data.
+# I will look into it in a little bit
+
 # Ensure factor levels are the same for confusion matrix calculation
-common_levels <- union(levels(test_data$pff_passCoverage), levels(testPred$.pred_class))
-testPred <- testPred |>
-  mutate(
-    pff_passCoverage = factor(test_data$pff_passCoverage, levels = common_levels),
-    .pred_class = factor(.pred_class, levels = common_levels)
-  )
+# common_levels <- union(levels(test_data$pff_passCoverage), levels(testPred$.pred_class))
+# testPred <- testPred |>
+#   mutate(
+#     pff_passCoverage = factor(test_data$pff_passCoverage, levels = common_levels),
+#    .pred_class = factor(.pred_class, levels = common_levels)
+#  )
 
 # Print accuracy
-accuracy(testPred, truth = pff_passCoverage, estimate = .pred_class)
+#accuracy(testPred, truth = pff_passCoverage, estimate = .pred_class)
 
 # Print confusion matrix
-confusionMatrix <- testPred |>
-  conf_mat(truth = pff_passCoverage, estimate = .pred_class)
-confusionMatrix
+#confusionMatrix <- testPred |>
+#  conf_mat(truth = pff_passCoverage, estimate = .pred_class)
+#confusionMatrix
 
 
+# Working to plot the data
+# Combine test dataset with predictions
+test_results <- bind_cols(test_data, testPred) |> 
+  rename(predicted = .pred_class)
 
+# Check mismatched rows where predictions and actual values differ
+mismatches <- test_results |> 
+  filter(predicted != pff_passCoverage)
+
+# Print mismatched rows
+print(mismatches)
+
+# Predicted Plot
+# predicted column for color
+plotPredicted <- ggplot(test_results, aes(x = down, y = yardsToGo, color = predicted)) +
+  geom_point(size = 4, alpha = 0.7) +
+  labs(
+    title = "Predicted pff_passCoverage by Down and Yards to Go",
+    x = "Down",
+    y = "Yards to Go",
+    color = "Predicted Coverage"
+  ) +
+  theme_minimal()
+
+# Actual Plot
+# pff_passCoverage for color
+plotActual <- ggplot(test_results, aes(x = down, y = yardsToGo, color = pff_passCoverage)) +
+  geom_point(size = 4, alpha = 0.7) +
+  labs(
+    title = "Actual pff_passCoverage by Down and Yards to Go",
+    x = "Down",
+    y = "Yards to Go",
+    color = "Actual Coverage"
+  ) +
+  theme_minimal()
+
+# Plot side by side
+library(gridExtra)
+grid.arrange(plotPredicted, plotActual, ncol = 2)
 
 
 
