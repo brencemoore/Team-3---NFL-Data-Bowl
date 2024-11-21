@@ -90,7 +90,7 @@ print(team_Ids)
 #"SF"  "CHI" "CLE" "NO" 
 
 # splits data into testing and training data to test logistic regression
-split <- initial_split(ATL_data, prop=.7)
+split <- initial_split(ready_master, prop=.7)
 train_data <- training(split)
 test_data <- testing(split)
 
@@ -100,7 +100,7 @@ logisticModel <- logistic_reg(mode="classification", engine="glm")
 
 # Fit a logistic regression model in tidymodels
 logisticModel_fit <- logisticModel |>
-  fit(pff_manZone ~ down + quarter + yardsToGo + gameClockSec, data=train_data)
+  fit(pff_manZone ~ yardsToGo, data=train_data)
 
 # Create a binary diagnosis feature with 1 if zone and 0 if man
 train_data <- train_data |>
