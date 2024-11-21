@@ -126,7 +126,4 @@ test_data <- augment(logisticModel_fit, test_data)
 test_data |> mn_log_loss(pff_manZone, .pred_M)
 test_data |> mn_log_loss(pff_manZone, .pred_Z)
 
-master_data$gameClock
-ready_master$gameClock
-ready_master$gameClockSec
 
