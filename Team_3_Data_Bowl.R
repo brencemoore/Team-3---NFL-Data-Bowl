@@ -20,7 +20,7 @@ cleaned_data <- na.omit(working_data)
 
 #remove other values
 cleaned_master <- cleaned_data |> filter(pff_manZone != 'Other')
-summary(ready_master)
+summary(cleaned_master)
 
 #get counts of each defensive alignment
 count_defs <- cleaned_master |> count(pff_passCoverage)
