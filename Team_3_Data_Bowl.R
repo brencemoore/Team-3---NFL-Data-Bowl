@@ -19,15 +19,15 @@ print(Other_data$playDescription)
 cleaned_data <- na.omit(working_data)
 
 #remove other values
-ready_master <- cleaned_data |> filter(pff_manZone != 'Other')
+cleaned_master <- cleaned_data |> filter(pff_manZone != 'Other')
 summary(ready_master)
 
 #get counts of each defensive alignment
-count_defs <- ready_master |> count(pff_passCoverage)
+count_defs <- cleaned_master |> count(pff_passCoverage)
 print(count_defs)
 
 #clean Cover-3 of variants and Cover-1 of Cover-1 Double
-modded_master <- ready_master |> mutate(pff_passCoverage = case_when(
+ready_master <- cleaned_master |> mutate(pff_passCoverage = case_when(
   pff_passCoverage == "Cover-3 Cloud Left" ~ "Cover-3",
   pff_passCoverage == "Cover-3 Cloud Right" ~ "Cover-3",
   pff_passCoverage == "Cover-3 Double Cloud" ~ "Cover-3",
