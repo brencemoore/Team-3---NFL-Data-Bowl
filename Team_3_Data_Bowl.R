@@ -155,13 +155,16 @@ testPred <- predict(CLEknnfit, test_data)
 # confusionMatrix
 
 
-# Working to plot the data
-# Combine test dataset with predictions
-test_results <- bind_cols(test_data, testPred) |> 
+
+
+
+# # Working to plot the data
+# # Combine test dataset with predictions
+test_results <- bind_cols(test_data, testPred) |>
   rename(predicted = .pred_class)
 
 # Check mismatched rows where predictions and actual values differ
-mismatches <- test_results |> 
+mismatches <- test_results |>
   filter(predicted != pff_passCoverage)
 
 # Print mismatched rows
@@ -193,8 +196,6 @@ plotActual <- ggplot(test_results, aes(x = down, y = yardsToGo, color = pff_pass
 
 # Plot side by side
 grid.arrange(plotPredicted, plotActual, ncol = 2)
-
-
 
 
 
