@@ -105,15 +105,14 @@ ready_master$pff_passCoverage <- as.factor(ready_master$pff_passCoverage)
 # https://www.youtube.com/watch?v=ZaMlS5hj2Kk
 # Random forest of pass coverages depending on all of the variables 
 # Consider removing importance = true (makes an n by n matrix)
-# We are going to try Detroit data
 rf <- randomForest(pff_passCoverage ~ quarter + down + yardsToGo + gameClock + defensiveTeam + pff_manZone, importance = TRUE, data = ready_master, ntree = 500)
 rf
 
 varImpPlot(rf)
 
 # Example for prediction
-new_data <- data.frame(quarter = 2, down = 4, yardsToGo = 2, 
-                       gameClock = "5:00", defensiveTeam = "DET",
+new_data <- data.frame(quarter = 2, down = 2, yardsToGo = 7, 
+                       gameClock = "7:00", defensiveTeam = "CLE",
                        pff_manZone = "Zone")  # Example
 new_data$pff_passCoverage <- predict(rf, newdata = new_data)
 print(new_data$pff_passCoverage)
