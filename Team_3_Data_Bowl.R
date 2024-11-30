@@ -91,75 +91,67 @@ TB_data <- ready_master  |> filter(defensiveTeam == 'TB')
 NO_data <- ready_master  |> filter(defensiveTeam == 'NO')
 CAR_data <- ready_master  |> filter(defensiveTeam == 'CAR')
 
-# We are looking to find how the defense performed based on all unique offensive plays ran 
 
-# Looking at what defensive alignment the defense goes into based on all of the variables in the test
-summary(CLE_data)
+# KNN
+# Developed by Logan McDavid
+# Source 1: https://github.com/SpencerPao/Data_Science/tree/main/KNN
+# Source 2: https://www.youtube.com/watch?v=htnZp__02qw
 
-# KNN is hwat I am going to try lol
-# Start with down and yards to go, seems simple enough right?
-# So in my head I am thinking x axis is down and y axis is yards until first down
-# Lets work with cleveland 
 
-# Getting a k value:
-#  We could do the sqrt(n) where n is the number of plays
+# Check unique pff_passCoverage values
+def_ids <- unique(ready_master$pff_passCoverage)
+print(def_ids) 
 
-# Finding unique variables
-# Check for unique pff_passCoverage values
-def_ids <- unique(CLE_data$pff_passCoverage)
-print(def_ids)  # Ensure there is variability in the target variable
-
-# Split the data into training and testing sets
+# Split data into training and testing sets
 set.seed(123)
 data_split <- initial_split(ready_master, prop = 0.7, strata = pff_passCoverage)
 train_data <- training(data_split)
 test_data <- testing(data_split)
 
-# Define the KNN model
-CLEknnClass <- nearest_neighbor(mode = "classification", neighbors = 4)
+# Define KNN model
+# k = sqrt(pff_passCoverage) 
+knnClass <- nearest_neighbor(mode = "classification", neighbors = 3)
 
-# Define the recipe with normalization
-CLEknnRecipe <- recipe(pff_passCoverage ~ down + yardsToGo, data = train_data) |> 
-  step_normalize(all_numeric_predictors())
 
-# Assemble the workflow
-CLEknnWflow <- workflow() |> 
-  add_recipe(CLEknnRecipe) |> 
-  add_model(CLEknnClass)
 
-# Fit the model
-CLEknnfit <- fit(CLEknnWflow, train_data)
+# ------- DEFINE RECIPE -------
 
-# Make predictions on the test set
-testPred <- predict(CLEknnfit, test_data)
+# Recipe 1: downs + yardsToGo
+knnRecipe <- recipe(pff_passCoverage ~ down + yardsToGo, data = train_data) |> 
+  step_normalize(all_numeric_predictors()) # Normalize values
 
-# I could be crazy but I think when I was running this code with my new code it was overtraining my data.
-# I will look into it in a little bit
+# Assemble workflow
+knnWflow <- workflow() |> 
+  add_recipe(knnRecipe) |> 
+  add_model(knnClass)
 
-# Confusion Matrix Mark out
-# Ensure factor levels are the same for confusion matrix calculation
+# Fit model
+knnfit <- fit(knnWflow, train_data)
 
-# common_levels <- union(levels(test_data$pff_passCoverage), levels(testPred$.pred_class))
-# testPred <- testPred |>
-#  mutate(
-#    pff_passCoverage = factor(test_data$pff_passCoverage, levels = common_levels),
-#   .pred_class = factor(.pred_class, levels = common_levels)
-# )
+# Make predictions on test set
+testPred <- predict(knnfit, test_data)
+
+
+# a. CONFUSION MATRIX
+# Ensure factor levels are same for confusion matrix calculation
+common_levels <- union(levels(test_data$pff_passCoverage), levels(testPred$.pred_class))
+confTestPred <- testPred |>
+ mutate(
+   pff_passCoverage = factor(test_data$pff_passCoverage, levels = common_levels),
+  .pred_class = factor(.pred_class, levels = common_levels)
+)
 
 # Print accuracy
-# accuracy(testPred, truth = pff_passCoverage, estimate = .pred_class)
+accuracy(confTestPred, truth = pff_passCoverage, estimate = .pred_class)
 
 # Print confusion matrix
-# confusionMatrix <- testPred |>
-#  conf_mat(truth = pff_passCoverage, estimate = .pred_class)
-# confusionMatrix
+confusionMatrix <- confTestPred |>
+ conf_mat(truth = pff_passCoverage, estimate = .pred_class)
+confusionMatrix
 
 
-
-
-
-# # Working to plot the data
-# # Combine test dataset with predictions
+# b. PREDICTED VS. ACTUAL
+# Combine test dataset with predictions
 test_results <- bind_cols(test_data, testPred) |>
   rename(predicted = .pred_class)
 
@@ -196,6 +188,9 @@ plotActual <- ggplot(test_results, aes(x = down, y = yardsToGo, color = pff_pass
 
 # Plot side by side
 grid.arrange(plotPredicted, plotActual, ncol = 2)
+
+
+# Recipe 2:
 
 
 
