@@ -1,8 +1,7 @@
 #Team 3:Samuel Hartmann, Logan McDavid, Brence Moore, Nathan Lamb
-
-#Code for reading in and sorting data written by Samuel
-#load tidyverse and plays.csv
 library(tidyverse)
+library(randomForest)
+library(rpart)
 master_data <- read.csv("plays.csv")
 
 #Select only gameId, playID, quarter, down, yardsToGo, defensiveTeam, gameClock, pff_passCoverage, and pff_manZone
@@ -91,26 +90,22 @@ NO_data <- ready_master  |> filter(defensiveTeam == 'NO')
 CAR_data <- ready_master  |> filter(defensiveTeam == 'CAR')
 
 
-# RANDOM FOREST TIME
-library(randomForest)
-library(rpart)
+# Random Forest
+#Developed by Logan McDavid
+# Source: https://www.youtube.com/watch?v=ZaMlS5hj2Kk
 
-# Convert pff_passCoverage to factors for detriot
-DET_data$pff_passCoverage <- as.factor(DET_data$pff_passCoverage)
 
-# Convert pff_passCoverage to factors for all teams
+# Convert pff_passCoverage to factors for ready_master
 ready_master$pff_passCoverage <- as.factor(ready_master$pff_passCoverage)
 
-
-# https://www.youtube.com/watch?v=ZaMlS5hj2Kk
-# Random forest of pass coverages depending on all of the variables 
-# Consider removing importance = true (makes an n by n matrix)
+# Random forest of pass coverages based on:
+# quarter, downm yardsToGo, gameClock, defensiveTeam, pff_manZone
+# Number of trees = 500
 rf <- randomForest(pff_passCoverage ~ quarter + down + yardsToGo + gameClock + defensiveTeam + pff_manZone, importance = TRUE, data = ready_master, ntree = 500)
 rf
 
-varImpPlot(rf)
 
-# Example for prediction
+# Predict specific instance
 new_data <- data.frame(quarter = 2, down = 2, yardsToGo = 7, 
                        gameClock = "7:00", defensiveTeam = "CLE",
                        pff_manZone = "Zone")  # Example
@@ -118,11 +113,9 @@ new_data$pff_passCoverage <- predict(rf, newdata = new_data)
 print(new_data$pff_passCoverage)
 
 
+# Print variable importance plot 
+varImpPlot(rf)
 
-# Debugging time
-str(DET_data$pff_passCoverage) # These are characters so convert to factors
-str(DET_data$down)
-str(DET_data$yardsToGo)
 
 
 
