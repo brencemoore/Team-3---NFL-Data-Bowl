@@ -44,11 +44,11 @@ logisticModel_fit <- logisticModel |>
 train_data <- train_data |>
   mutate(pff_manZone = ifelse(pff_manZone=="Z", 1, 0))
 
-# Graph logistic regression probabilities
+# Graph logistic regression probabilities with variable yardsToGo
 train_data |>
   ggplot(aes(x=yardsToGo, y=pff_manZone)) +
   geom_point() +
-  geom_smooth(formula ='y ~ x', method = "glm", method.args = list(family = "bi>
+  geom_smooth(formula ='y ~ x', method = "glm", method.args = list(family = "binomial"),
               se = FALSE) +
   labs(x="yards to go", y="probability of zone")
 
@@ -63,14 +63,4 @@ test_data <- augment(logisticModel_fit, test_data)
 
 test_data |> mn_log_loss(pff_manZone, .pred_M)
 test_data |> mn_log_loss(pff_manZone, .pred_Z)
-
-ready_master |>
-  ggplot(aes(x = yardsToGo, y = down, color = pff_manZone)) +
-  geom_point() +
-  labs(x = "yards to go", y = "down") +
-  scale_color_manual(values = c("blue", "red"), labels = c("Zone", "Man"))
-
-ggplot(ready_master, aes(x=pff_passCoverage, y=down, fill=pff_passCoverage)) +
-  geom_boxplot(alpha=0.3) +
-  theme(legend.position="none")
 
