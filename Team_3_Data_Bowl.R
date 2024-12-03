@@ -1,7 +1,6 @@
 #Team 3:Samuel Hartmann, Logan McDavid, Brence Moore, Nathan Lamb
 library(tidyverse)
 library(randomForest)
-library(rpart)
 master_data <- read.csv("plays.csv")
 
 #Select only gameId, playID, quarter, down, yardsToGo, defensiveTeam, gameClock, pff_passCoverage, and pff_manZone
