@@ -141,6 +141,11 @@ CAR_data <- ready_master  |> filter(defensiveTeam == 'CAR')
 # Source 2: https://www.youtube.com/watch?v=htnZp__02qw
 # ------------------------------------
 
+# Packages included
+library(tidymodels)
+library(gridExtra)
+library(kknn)
+
 # Additional cleaning done in order to preform knn
 # manZone as factor
 ready_master <- ready_master |> 
@@ -413,6 +418,9 @@ grid.arrange(plotPredicted, plotActual, ncol = 2)
 # Source: https://www.youtube.com/watch?v=ZaMlS5hj2Kk
 # ------------------------------------
 
+# Packages included
+library(tidyverse)
+library(randomForest)
 
 # Convert pff_passCoverage to factors for ready_master
 ready_master$pff_passCoverage <- as.factor(ready_master$pff_passCoverage)
