@@ -98,16 +98,24 @@ CAR_data <- ready_master  |> filter(defensiveTeam == 'CAR')
 # Convert pff_passCoverage to factors for ready_master
 ready_master$pff_passCoverage <- as.factor(ready_master$pff_passCoverage)
 
+# Convert time to seconds
+ready_master <- ready_master |>
+  mutate(gameClockSec = sapply(strsplit(gameClock, ":"), function(x) {
+    minutes <- as.numeric(x[1])
+    seconds <- as.numeric(x[2])
+    minutes * 60 + seconds
+  }))
+
 # Random forest of pass coverages based on:
 # quarter, downm yardsToGo, gameClock, defensiveTeam, pff_manZone
 # Number of trees = 500
-rf <- randomForest(pff_passCoverage ~ quarter + down + yardsToGo + gameClock + defensiveTeam + pff_manZone, importance = TRUE, data = ready_master, ntree = 500)
+rf <- randomForest(pff_passCoverage ~ quarter + down + yardsToGo + gameClockSec + defensiveTeam + pff_manZone, importance = TRUE, data = ready_master, ntree = 500)
 rf
 
 
 # Predict specific instance
 new_data <- data.frame(quarter = 2, down = 2, yardsToGo = 7, 
-                       gameClock = "7:00", defensiveTeam = "CLE",
+                       gameClockSec = "7:00", defensiveTeam = "CLE",
                        pff_manZone = "Zone")  # Example
 new_data$pff_passCoverage <- predict(rf, newdata = new_data)
 print(new_data$pff_passCoverage)
