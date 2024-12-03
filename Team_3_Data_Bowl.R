@@ -3,6 +3,7 @@ library(tidyverse)
 library(tidymodels)
 library(gridExtra)
 library(kknn)
+# library(lubridate)
 
 master_data <- read.csv("plays.csv")
 
@@ -97,6 +98,31 @@ CAR_data <- ready_master  |> filter(defensiveTeam == 'CAR')
 # Source 1: https://github.com/SpencerPao/Data_Science/tree/main/KNN
 # Source 2: https://www.youtube.com/watch?v=htnZp__02qw
 
+# Additional cleaning done in order to preform knn
+# manZone as factor
+ready_master <- ready_master |> 
+  mutate(pff_manZone = factor(pff_manZone))
+
+ready_master <- ready_master |>
+  mutate(gameClock = factor(gameClock))
+summary(ready_master)
+
+# Convert to percentage perhaps
+ready_master <- ready_master |> 
+  mutate(
+    gameClockSeconds = as.numeric(sub(".*:", "", gameClock)),
+    gameClockMinutes = as.numeric(sub(":.*", "", gameClock)),
+    totalSeconds = gameClockMinutes * 60 + gameClockSeconds
+  )
+
+# NOTE: 100% = start of quarter 0% - end
+ready_master <- ready_master |> 
+  mutate(
+    quarterPercentage = (totalSeconds / 900) * 100
+  )
+
+
+
 
 # Check unique pff_passCoverage values
 def_ids <- unique(ready_master$pff_passCoverage)
@@ -114,9 +140,10 @@ knnClass <- nearest_neighbor(mode = "classification", neighbors = 3)
 
 
 
+
 # ------- DEFINE RECIPE -------
 
-# Recipe 1: downs + yardsToGo
+# RECIPE 1: downs + yardsToGo
 knnRecipe <- recipe(pff_passCoverage ~ down + yardsToGo, data = train_data) |> 
   step_normalize(all_numeric_predictors()) # Normalize values
 
@@ -190,12 +217,94 @@ plotActual <- ggplot(test_results, aes(x = down, y = yardsToGo, color = pff_pass
 grid.arrange(plotPredicted, plotActual, ncol = 2)
 
 
-# Recipe 2:
+
+# RECIPE 2: pff_manZone + gameClock
+knnRecipe <- recipe(pff_passCoverage ~ pff_manZone + gameClock, data = train_data) |> 
+  step_normalize(all_numeric_predictors()) # Normalize values
+
+# Assemble workflow
+knnWflow <- workflow() |> 
+  add_recipe(knnRecipe) |> 
+  add_model(knnClass)
+
+# Fit model
+knnfit <- fit(knnWflow, train_data)
+
+# Make predictions on test set
+testPred <- predict(knnfit, test_data)
 
 
+# a. CONFUSION MATRIX
+# Ensure factor levels are same for confusion matrix calculation
+common_levels <- union(levels(test_data$pff_passCoverage), levels(testPred$.pred_class))
+confTestPred <- testPred |>
+  mutate(
+    pff_passCoverage = factor(test_data$pff_passCoverage, levels = common_levels),
+    .pred_class = factor(.pred_class, levels = common_levels)
+  )
+
+# Print accuracy
+accuracy(confTestPred, truth = pff_passCoverage, estimate = .pred_class)
+
+# Print confusion matrix
+confusionMatrix <- confTestPred |>
+  conf_mat(truth = pff_passCoverage, estimate = .pred_class)
+confusionMatrix
 
 
+# b. PREDICTED VS. ACTUAL
+# Combine test dataset with predictions
+test_results <- bind_cols(test_data, testPred) |>
+  rename(predicted = .pred_class)
+
+# Check mismatched rows where predictions and actual values differ
+mismatches <- test_results |>
+  filter(predicted != pff_passCoverage)
+
+# Print mismatched rows
+print(mismatches)
+
+# Predicted Plot
+# predicted column for color
+plotPredicted <- ggplot(test_results, aes(x = pff_manZone, y = gameClock, color = predicted)) +
+  geom_point(size = 4, alpha = 0.7) +
+  labs(
+    title = "Predicted pff_passCoverage by Down and Yards to Go",
+    x = "pff_manZone",
+    y = "gameClock",
+    color = "Predicted Coverage"
+  ) +
+  theme_minimal()
+
+# Actual Plot
+# pff_passCoverage for color
+plotActual <- ggplot(test_results, aes(x = pff_manZone, y = gameClock, color = pff_passCoverage)) +
+  geom_point(size = 4, alpha = 0.7) +
+  labs(
+    title = "Actual pff_passCoverage by Down and Yards to Go",
+    x = "pff_manZone",
+    y = "gameClock",
+    color = "Actual Coverage"
+  ) +
+  theme_minimal()
+
+# Plot side by side
+grid.arrange(plotPredicted, plotActual, ncol = 2)
 
 
+# Debugging lines
+str(train_data)
+str(test_data)
 
+# Check unique values and summaries
+unique(train_data$pff_manZone)
+unique(test_data$pff_manZone)
 
+summary(train_data$gameClock)
+summary(test_data$gameClock)
+
+class(ready_master$pff_manZone)
+# So we need to make pff_manZone a factor
+
+class(ready_master$gameClock)
+# Also split into a factor
