@@ -103,23 +103,13 @@ CAR_data <- ready_master  |> filter(defensiveTeam == 'CAR')
 ready_master <- ready_master |> 
   mutate(pff_manZone = factor(pff_manZone))
 
+# Convert to seconds
 ready_master <- ready_master |>
-  mutate(gameClock = factor(gameClock))
-summary(ready_master)
-
-# Convert to percentage perhaps
-ready_master <- ready_master |> 
-  mutate(
-    gameClockSeconds = as.numeric(sub(".*:", "", gameClock)),
-    gameClockMinutes = as.numeric(sub(":.*", "", gameClock)),
-    totalSeconds = gameClockMinutes * 60 + gameClockSeconds
-  )
-
-# NOTE: 100% = start of quarter 0% - end
-ready_master <- ready_master |> 
-  mutate(
-    quarterPercentage = (totalSeconds / 900) * 100
-  )
+  mutate(gameClockSec = sapply(strsplit(gameClock, ":"), function(x) {
+    minutes <- as.numeric(x[1])
+    seconds <- as.numeric(x[2])
+    minutes * 60 + seconds
+  }))
 
 
 
@@ -219,7 +209,8 @@ grid.arrange(plotPredicted, plotActual, ncol = 2)
 
 
 # RECIPE 2: pff_manZone + gameClock
-knnRecipe <- recipe(pff_passCoverage ~ pff_manZone + gameClock, data = train_data) |> 
+# I have found this one to not be very helpful
+knnRecipe <- recipe(pff_passCoverage ~ pff_manZone + gameClockSec, data = train_data) |> 
   step_normalize(all_numeric_predictors()) # Normalize values
 
 # Assemble workflow
@@ -266,25 +257,35 @@ print(mismatches)
 
 # Predicted Plot
 # predicted column for color
-plotPredicted <- ggplot(test_results, aes(x = pff_manZone, y = gameClock, color = predicted)) +
+plotPredicted <- ggplot(test_results, aes(x = pff_manZone, y = gameClockSec, color = predicted)) +
   geom_point(size = 4, alpha = 0.7) +
   labs(
-    title = "Predicted pff_passCoverage by Down and Yards to Go",
+    title = "Predicted pff_passCoverage by pff_manZone and gameClock",
     x = "pff_manZone",
     y = "gameClock",
     color = "Predicted Coverage"
+  ) +
+  scale_y_continuous(
+    breaks = seq(min(test_results$gameClockSec, na.rm = TRUE), 
+                 max(test_results$gameClockSec, na.rm = TRUE), 
+                 by = 60) # Adjust the interval if necessary
   ) +
   theme_minimal()
 
 # Actual Plot
 # pff_passCoverage for color
-plotActual <- ggplot(test_results, aes(x = pff_manZone, y = gameClock, color = pff_passCoverage)) +
+plotActual <- ggplot(test_results, aes(x = pff_manZone, y = gameClockSec, color = pff_passCoverage)) +
   geom_point(size = 4, alpha = 0.7) +
   labs(
-    title = "Actual pff_passCoverage by Down and Yards to Go",
+    title = "Actual pff_passCoverage by pff_manZone and gameClock",
     x = "pff_manZone",
     y = "gameClock",
     color = "Actual Coverage"
+  ) +
+  scale_y_continuous(
+    breaks = seq(min(test_results$gameClockSec, na.rm = TRUE), 
+                 max(test_results$gameClockSec, na.rm = TRUE), 
+                 by = 60) # Adjust the interval if necessary
   ) +
   theme_minimal()
 
@@ -292,19 +293,76 @@ plotActual <- ggplot(test_results, aes(x = pff_manZone, y = gameClock, color = p
 grid.arrange(plotPredicted, plotActual, ncol = 2)
 
 
-# Debugging lines
-str(train_data)
-str(test_data)
 
-# Check unique values and summaries
-unique(train_data$pff_manZone)
-unique(test_data$pff_manZone)
+# RECIPE 3: pff_manZone + yardsToGo
+knnRecipe <- recipe(pff_passCoverage ~ pff_manZone + yardsToGo, data = train_data) |> 
+  step_normalize(all_numeric_predictors()) # Normalize values
 
-summary(train_data$gameClock)
-summary(test_data$gameClock)
+# Assemble workflow
+knnWflow <- workflow() |> 
+  add_recipe(knnRecipe) |> 
+  add_model(knnClass)
 
-class(ready_master$pff_manZone)
-# So we need to make pff_manZone a factor
+# Fit model
+knnfit <- fit(knnWflow, train_data)
 
-class(ready_master$gameClock)
-# Also split into a factor
+# Make predictions on test set
+testPred <- predict(knnfit, test_data)
+
+
+# a. CONFUSION MATRIX
+# Ensure factor levels are same for confusion matrix calculation
+common_levels <- union(levels(test_data$pff_passCoverage), levels(testPred$.pred_class))
+confTestPred <- testPred |>
+  mutate(
+    pff_passCoverage = factor(test_data$pff_passCoverage, levels = common_levels),
+    .pred_class = factor(.pred_class, levels = common_levels)
+  )
+
+# Print accuracy
+accuracy(confTestPred, truth = pff_passCoverage, estimate = .pred_class)
+
+# Print confusion matrix
+confusionMatrix <- confTestPred |>
+  conf_mat(truth = pff_passCoverage, estimate = .pred_class)
+confusionMatrix
+
+
+# b. PREDICTED VS. ACTUAL
+# Combine test dataset with predictions
+test_results <- bind_cols(test_data, testPred) |>
+  rename(predicted = .pred_class)
+
+# Check mismatched rows where predictions and actual values differ
+mismatches <- test_results |>
+  filter(predicted != pff_passCoverage)
+
+# Print mismatched rows
+print(mismatches)
+
+# Predicted Plot
+# predicted column for color
+plotPredicted <- ggplot(test_results, aes(x = pff_manZone, y = yardsToGo, color = predicted)) +
+  geom_point(size = 4, alpha = 0.7) +
+  labs(
+    title = "Predicted pff_passCoverage by Down and Yards to Go",
+    x = "pff_manZone",
+    y = "Yards to Go",
+    color = "Predicted Coverage"
+  ) +
+  theme_minimal()
+
+# Actual Plot
+# pff_passCoverage for color
+plotActual <- ggplot(test_results, aes(x = pff_manZone, y = yardsToGo, color = pff_passCoverage)) +
+  geom_point(size = 4, alpha = 0.7) +
+  labs(
+    title = "Actual pff_passCoverage by Down and Yards to Go",
+    x = "pff_manZone",
+    y = "Yards to Go",
+    color = "Actual Coverage"
+  ) +
+  theme_minimal()
+
+# Plot side by side
+grid.arrange(plotPredicted, plotActual, ncol = 2)
