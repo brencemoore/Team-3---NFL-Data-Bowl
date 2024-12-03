@@ -126,4 +126,46 @@ test_data <- augment(logisticModel_fit, test_data)
 test_data |> mn_log_loss(pff_manZone, .pred_M)
 test_data |> mn_log_loss(pff_manZone, .pred_Z)
 
+ready_master |>
+  ggplot(aes(x = yardsToGo, y = down, color = pff_manZone)) + 
+  geom_point() + 
+  labs(x = "yards to go", y = "down") + 
+  scale_color_manual(values = c("blue", "red"), labels = c("Zone", "Man"))
 
+ggplot(ready_master, aes(x=pff_passCoverage, y=down, fill=pff_passCoverage)) + 
+  geom_boxplot(alpha=0.3) +
+  theme(legend.position="none")
+
+datasets_list <- list(BUF_data, MIA_data, NJY_data, NE_data)#, 
+                      KC_data, LAC_data, DEN_data, LV_data, 
+                      PIT_data, BAL_data, CIN_data, CLE_data, 
+                      HOU_data, IND_data, TEN_data, JAX_data, 
+                      PHI_data, WAS_data, DAL_data, NYG_data, 
+                      ARI_data, SF_data, LA_data, STL_data, 
+                      DET_data, MIN_data, GB_data, CHI_data, 
+                      ATL_data, TB_data, NO_data, CAR_data)
+
+# Add an identifier for each dataset and combine them into one data frame
+combined_data <- bind_rows(
+  lapply(seq_along(datasets_list), function(i) {
+    datasets_list[[i]] %>%
+      mutate(dataset_id = paste("Dataset", i))  # Add an identifier column
+  })
+)
+
+# Plot combined data with dataset_id as fill
+ggplot(combined_data, aes(x = pff_passCoverage, y = yardsToGo, fill = dataset_id)) + 
+  geom_boxplot(alpha = 0.3) +
+  theme(legend.position = "right") +
+  labs(x = "PFF Pass Coverage", y = "Down", fill = "Dataset")
+
+ggplot(combined_data, aes(x = dataset_id, y = yardsToGo, fill = pff_passCoverage)) + 
+  geom_boxplot(alpha = 0.3) +
+  theme(legend.position = "none") +
+  labs(x = "Dataset", y = "yards to go")
+
+ggplot(combined_data, aes(x = dataset_id, y = yardsToGo, fill = pff_passCoverage)) + 
+  geom_violin(alpha = 0.3, position = position_dodge(width = 0.75)) +  # Adds density-based violin plot
+  geom_boxplot(width = 0.2, position = position_dodge(width = 0.75), alpha = 0.5) +  # Adds boxplot within the violin plot
+  theme(legend.position = "right") +
+  labs(x = "Dataset", y = "Yards to Go", fill = "Pass Coverage")
