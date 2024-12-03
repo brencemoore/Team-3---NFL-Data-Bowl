@@ -9,6 +9,19 @@ master_data <- read.csv("plays.csv")
 working_data <- master_data |> select(gameId, playId, quarter, down, yardsToGo, defensiveTeam, gameClock, pff_passCoverage, pff_manZone)
 summary(working_data)
 
+# Plot the working data
+ggplot(working_data, aes(x = pff_passCoverage)) +
+  geom_bar(fill = "purple", color = "black") +
+  labs(
+    title = "Total Count of Defensive Schemes",
+    x = "Defensive Scheme",
+    y = "Count"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
 #Review Na and Other Values
 Na_data <- master_data |> filter(is.na(pff_manZone))
 Other_data <- master_data |> filter(pff_manZone == 'Other')
@@ -16,11 +29,24 @@ print(Na_data$playDescription)
 print(Other_data$playDescription)
 
 #remove row with NA values
-cleaned_data <- na.omit(working_data)
+cleaned_data <- na.omit
 
 #remove other values
 cleaned_master <- cleaned_data |> filter(pff_manZone != 'Other')
 summary(cleaned_master)
+
+# Plot the cleaned data
+ggplot(cleaned_master, aes(x = pff_passCoverage)) +
+  geom_bar(fill = "purple", color = "black") +
+  labs(
+    title = "Total Count of Defensive Schemes",
+    x = "Defensive Scheme",
+    y = "Count"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
 
 #get counts of each defensive alignment
 count_defs <- cleaned_master |> count(pff_passCoverage)
@@ -33,6 +59,19 @@ ready_master <- cleaned_master |> mutate(pff_passCoverage = case_when(
   pff_passCoverage == "Cover-3 Double Cloud" ~ "Cover-3",
   pff_passCoverage == "Cover-1 Double" ~ "Cover-1",
   TRUE ~ pff_passCoverage))
+
+# Plot the master data
+ggplot(ready_master, aes(x = pff_passCoverage)) +
+  geom_bar(fill = "purple", color = "black") +
+  labs(
+    title = "Total Count of Defensive Schemes",
+    x = "Defensive Scheme",
+    y = "Count"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
 
 #get counts of each defensive alignment after cleaning
 count_defs <- ready_master |> count(pff_passCoverage)
