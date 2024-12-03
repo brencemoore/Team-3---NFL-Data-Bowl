@@ -74,7 +74,7 @@ library(rpart)
 library(rpart.plot)
 
 # Load the data
-plays <- read.csv(file.choose())
+plays <- read.csv("plays.csv")
 
 # Filter for plays where the Buffalo Bills are on offense
 BUF_data <- subset(plays, possessionTeam == "BUF")
@@ -107,7 +107,7 @@ decision_tree <- rpart(pff_runConceptPrimary ~ down + yardsToGoCategory + quarte
                        data = train_data, method = "class")
 
 # Visualize the decision tree
-rpart.plot(decision_tree)
+rpart.plot(decision_tree, cex = .8, type = 5, extra = 0)
 
 # Evaluate the model
 test_predictions <- predict(decision_tree, newdata = test_data, type = "class")
