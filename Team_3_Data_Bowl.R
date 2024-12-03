@@ -3,7 +3,6 @@ library(tidyverse)
 library(tidymodels)
 library(gridExtra)
 library(kknn)
-# library(lubridate)
 
 master_data <- read.csv("plays.csv")
 
