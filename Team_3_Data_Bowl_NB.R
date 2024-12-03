@@ -9,24 +9,24 @@ master_data <- read.csv("plays.csv")
 
 #Select only gameId, playID, quarter, down, yardsToGo, defensiveTeam, gameClock, pff_passCoverage, and pff_manZone
 working_data <- master_data |> select(gameId, playId, quarter, down, yardsToGo, defensiveTeam, gameClock, pff_passCoverage, pff_manZone)
-summary(working_data)
+#summary(working_data)
 
 #Review Na and Other Values
 Na_data <- master_data |> filter(is.na(pff_manZone))
 Other_data <- master_data |> filter(pff_manZone == 'Other')
-print(Na_data$playDescription)
-print(Other_data$playDescription)
+#print(Na_data$playDescription)
+#print(Other_data$playDescription)
 
 #remove row with NA values
 cleaned_data <- na.omit(working_data)
 
 #remove other values
 cleaned_master <- cleaned_data |> filter(pff_manZone != 'Other')
-summary(cleaned_master)
+#summary(cleaned_master)
 
 #get counts of each defensive alignment
 count_defs <- cleaned_master |> count(pff_passCoverage)
-print(count_defs)
+#print(count_defs)
 
 #clean Cover-3 of variants and Cover-1 of Cover-1 Double
 ready_master <- cleaned_master |> mutate(pff_passCoverage = case_when(
@@ -42,7 +42,7 @@ print(count_defs)
 
 #get list of team Ids
 team_Ids <- unique(ready_master$defensiveTeam)
-print(team_Ids)
+#print(team_Ids)
 
 #AFC East
 BUF_data <- ready_master  |> filter(defensiveTeam == 'BUF')
@@ -97,51 +97,85 @@ count_defs <- ready_master |> count(pff_passCoverage)
 print(count_defs)
 #Samuel Naive Bayes
 
-#split off just pff_passcoverage
+#split quarter, down, yards to go, gameclock, and pass_coverage off into new df
 pass_coverage <- ready_master %>%
-  select(quarter, down, yardsToGo, pff_passCoverage) %>%
-  mutate(
-    quarter = as.factor(quarter),
-    down = as.factor(down),
-    pff_passCoverage = as.factor(pff_passCoverage)
-  )
+  select(quarter, down, yardsToGo, gameClock, pff_passCoverage)
 
-# Step 2: Split the data into training and testing sets
-set.seed(123)  # For reproducibility
-data_split <- initial_split(pass_coverage, prop = 0.75)
+#set seed
+set.seed(110)
+
+# Convert time to seconds
+pass_coverage <- pass_coverage |>
+  mutate(gameClockSec = sapply(strsplit(gameClock, ":"), function(x) {
+    minutes <- as.numeric(x[1])
+    seconds <- as.numeric(x[2])
+    minutes * 60 + seconds
+  }))
+
+# Split the data into training and testing sets stratafied on pff_passCoverage
+data_split <- initial_split(pass_coverage, prop = 0.70, strata = pff_passCoverage)
 train_data <- training(data_split)
 test_data <- testing(data_split)
 
-# Step 3: Create a recipe with only down and yardsToGo as predictors
-recipe <- recipe(pff_passCoverage ~ down + yardsToGo, data = train_data)
+# Create a recipe with quarter, down, yardsToGo, and gameClockSec
+coverage_recipe <- recipe(pff_passCoverage ~quarter + down + yardsToGo + gameClockSec, data = train_data)
 
-# Step 4: Prepare the recipe
-prepared_recipe <- prep(recipe, training = train_data)
+# Prepare the recipe
+prepared_recipe <- prep(coverage_recipe)
 
-# Step 5: Bake the training and test data
-x_train <- bake(prepared_recipe, new_data = NULL)  # Training data
-x_test <- bake(prepared_recipe, new_data = test_data)  # Test data
+# Bake the training and test data based on recipe
+train_baked <- prepared_recipe |> bake(new_data = NULL)
+test_baked <- prepared_recipe |> bake(new_data = test_data)
 
-# Step 6: Extract target variable for training
-y_train <- x_train$pff_passCoverage  # Target variable
+#marticize the train data
+x <- train_baked |> select(-pff_passCoverage) |> as.matrix()
 
-# Remove the target variable from the training feature set
-x_train <- x_train %>% select(-pff_passCoverage)
+#extract the test data
+y <- train_baked$pff_passCoverage
 
-# Convert the training data to a matrix format suitable for multinomial_naive_bayes
-x_train_matrix <- model.matrix(~ . - 1, data = x_train)  # Convert to matrix, exclude intercept
-x_test_matrix <- model.matrix(~ . - 1, data = x_test)    # Convert test data similarly
+# Fit the Multinomial Naive Bayes model using naivebayes::multinomial_naive_bayes
+mnb <- naivebayes::multinomial_naive_bayes(x, y, laplace = 1)
 
-# Step 7: Fit the Multinomial Naive Bayes model using naivebayes::multinomial_naive_bayes
-model <- naivebayes::multinomial_naive_bayes(x = x_train_matrix, y = y_train, laplace = 1)
+# Add the predictions from the model onto the dataset
+train_predict <- train_data |>  mutate(.pred_class = predict(mnb, x))
 
-# Step 8: Make predictions on the test set
-predictions <- predict(model, newdata = x_test_matrix)
+# Create a confusion matrix for the training data using the predictions stored in train_predict
+train_confusion_matrix <- table(Predicted = train_predict$.pred_class, Actual = train_predict$pff_passCoverage)
+print("Training Confusion Matrix:")
+print(train_confusion_matrix)
 
-# Step 9: Evaluate the model
-confusion_matrix <- table(predictions, x_test$pff_passCoverage)
-print(confusion_matrix)
+# Predict from test data
+test_matrix <- test_baked |> select(-pff_passCoverage) |> as.matrix()
+test_predict <- test_data |> mutate(.pred_class = predict(mnb, test_matrix))
 
-# Optional: Calculate accuracy
-accuracy <- sum(predictions == x_test$pff_passCoverage) / nrow(x_test)
-print(paste("Accuracy:", round(accuracy, 2)))
+# Create a confusion matrix for the test data
+test_confusion_matrix <- table(Predicted = test_predict$.pred_class, Actual = test_data$pff_passCoverage)
+print("Test Confusion Matrix:")
+print(test_confusion_matrix)
+
+# Calculate accuracy for the test data
+test_accuracy <- sum(test_predict$.pred_class == test_data$pff_passCoverage) / nrow(test_data)
+print(paste("Test Accuracy:", round(test_accuracy, 2)))
+
+# Convert the confusion matrix to a data frame
+confusion_long <- as.data.frame(test_confusion_matrix)
+
+# Check the structure of the confusion_long data frame
+str(confusion_long)
+
+# Rename columns to make them clearer
+colnames(confusion_long) <- c("Predicted", "Actual", "Count")
+
+# Create a new column for Correct/Incorrect prediction
+confusion_long <- confusion_long %>%
+  mutate(Prediction = ifelse(Actual == Predicted, "Correct", "Incorrect"))
+
+# Create the ggplot visualization
+ggplot(confusion_long, aes(x = Actual, y = Count, fill = Prediction)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Confusion Matrix Visualization",
+       x = "Actual Class",
+       y = "Count",
+       fill = "Prediction") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
