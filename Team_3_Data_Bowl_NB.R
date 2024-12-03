@@ -2,10 +2,9 @@
 
 #Code for reading in and sorting data written by Samuel
 #load tidyverse and plays.csv
-install.packages("naivebayes")
 library(tidyverse)
-library(discrim)
 library(tidymodels)
+library(discrim)
 master_data <- read.csv("plays.csv")
 
 #Select only gameId, playID, quarter, down, yardsToGo, defensiveTeam, gameClock, pff_passCoverage, and pff_manZone
@@ -97,41 +96,52 @@ CAR_data <- ready_master  |> filter(defensiveTeam == 'CAR')
 count_defs <- ready_master |> count(pff_passCoverage)
 print(count_defs)
 #Samuel Naive Bayes
-# Convert the target variable to a factor
-count_defs$pff_passCoverage <- as.factor(count_defs$pff_passCoverage)
 
-# Expand the data frame based on counts
-data_expanded <- count_defs[rep(seq_len(nrow(count_defs)), count_defs$n), 1, drop = FALSE]
+#split off just pff_passcoverage
+pass_coverage <- ready_master %>%
+  select(quarter, down, yardsToGo, pff_passCoverage) %>%
+  mutate(
+    quarter = as.factor(quarter),
+    down = as.factor(down),
+    pff_passCoverage = as.factor(pff_passCoverage)
+  )
 
-# Split the data into training and testing sets using initial_split
+# Step 2: Split the data into training and testing sets
 set.seed(123)  # For reproducibility
-data_split <- initial_split(data_expanded, prop = 0.75, strata = pff_passCoverage)
-
+data_split <- initial_split(pass_coverage, prop = 0.75)
 train_data <- training(data_split)
 test_data <- testing(data_split)
 
-# Create a recipe for preprocessing (if needed)
-recipe <- recipe(pff_passCoverage ~ ., data = train_data)
+# Step 3: Create a recipe with only down and yardsToGo as predictors
+recipe <- recipe(pff_passCoverage ~ down + yardsToGo, data = train_data)
 
-# Specify the Multinomial Naive Bayes model
-model <- discrim_multinomial()
+# Step 4: Prepare the recipe
+prepared_recipe <- prep(recipe, training = train_data)
 
-# Create a workflow
-workflow <- workflow() %>%
-  add_recipe(recipe) %>%
-  add_model(model)
+# Step 5: Bake the training and test data
+x_train <- bake(prepared_recipe, new_data = NULL)  # Training data
+x_test <- bake(prepared_recipe, new_data = test_data)  # Test data
 
-# Fit the model
-fitted_model <- fit(workflow, data = train_data)
+# Step 6: Extract target variable for training
+y_train <- x_train$pff_passCoverage  # Target variable
 
-# Make predictions on new data
-# Assuming you have a dataframe `test_data`
-test_data <- data.frame(
-  feature1 = c(1, 2),
-  feature2 = c(3, 4)
-)
+# Remove the target variable from the training feature set
+x_train <- x_train %>% select(-pff_passCoverage)
 
-predictions <- predict(fitted_model, new_data = test_data)
+# Convert the training data to a matrix format suitable for multinomial_naive_bayes
+x_train_matrix <- model.matrix(~ . - 1, data = x_train)  # Convert to matrix, exclude intercept
+x_test_matrix <- model.matrix(~ . - 1, data = x_test)    # Convert test data similarly
 
-# View predictions
-predictions
+# Step 7: Fit the Multinomial Naive Bayes model using naivebayes::multinomial_naive_bayes
+model <- naivebayes::multinomial_naive_bayes(x = x_train_matrix, y = y_train, laplace = 1)
+
+# Step 8: Make predictions on the test set
+predictions <- predict(model, newdata = x_test_matrix)
+
+# Step 9: Evaluate the model
+confusion_matrix <- table(predictions, x_test$pff_passCoverage)
+print(confusion_matrix)
+
+# Optional: Calculate accuracy
+accuracy <- sum(predictions == x_test$pff_passCoverage) / nrow(x_test)
+print(paste("Accuracy:", round(accuracy, 2)))
